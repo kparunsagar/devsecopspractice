@@ -9,7 +9,7 @@ trigger:
 variables:
 
   # Azure Resource Manager connection created during pipeline creation
-  azureSubscription: '684ebe5a-d293-46cc-b739-286bf43f533f'
+  azureSubscription: '684ebe5a-d293-46cc-b739-286bf43f533f1'
 
   # Web app name
   webAppName: 'mysqlarun'
@@ -38,7 +38,7 @@ stages:
     - task: DockerCompose@0
       inputs:
         containerregistrytype: 'Azure Container Registry'
-        azureSubscription: 'BFSI_LGI_DevOps_Training_POC (f3f0b402-1498-4537-9728-704a780011a0)'
+        azureSubscription: 'BFSI_LGI_DevOps_Training_POC (f3f0b402-1498-4537-9728-704a780011a01)'
         dockerComposeFile: '**/docker-compose.yaml'
         action: 'Run a Docker Compose command'
         dockerComposeCommand: 'build'
