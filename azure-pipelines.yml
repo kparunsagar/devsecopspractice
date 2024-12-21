@@ -9,7 +9,7 @@ trigger:
 variables:
 
   # Azure Resource Manager connection created during pipeline creation
-  azureSubscription: '684ebe5a-d293-46cc-b739-286bf43f533f1'
+  azureSubscription: ''
 
   # Web app name
   webAppName: 'mysqlarun'
