@@ -1,0 +1,92 @@
+// multistage
+pipeline {
+    agent any
+
+    tools {
+        git 'git'  // Git tool configured in Jenkins
+        maven 'maven'  // Maven tool configured in Jenkins Global Tool Configuration
+    }
+
+    environment {
+        ARTIFACTORY_SERVER = 'Artifactory'
+        CI = true
+        ARTIFACTORY_ACCESS_TOKEN = credentials('artifactory-access-token')  // Using credentials to securely pass the token
+        PATH = "$HOME/.local/bin:$PATH"  // Add JFrog CLI location to PATH
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub')
+        DOCKER_IMAGE = 'kparun/springbootapp'
+    }
+
+        stages {
+            stage('Source') {
+                steps {
+                    git url: 'https://github.com/kparunsagar/pipeline_springboot.git'
+                }
+            }
+            stage('Build') {
+                steps {
+                    script {
+                        def mvnHome = tool 'maven'
+                        bat "${mvnHome}\\bin\\mvn -B verify"
+                    }
+                }
+            }
+            stage('Test') {
+                steps {
+                    script {
+                        def mvnHome = tool 'maven'
+                        echo "-----------Unit test started--------------"
+                        sh 'mvn surefire-report:report'
+                        echo "-----------Unit test completed--------------"
+                    }
+                }
+            }
+            stage('SonarQube Analysis') {
+                steps {
+                    script {
+                        def mvnHome = tool 'maven'
+                        withSonarQubeEnv() {
+                            bat "${mvnHome}/bin/mvn clean verify sonar:sonar -Dsonar.projectKey=sts"
+                        }
+                    }
+                }
+            }
+            stage("Quality Gate"){
+            timeout(time: 1, unit: 'HOURS') { // Just in case something goes wrong, pipeline will be killed after a timeout
+                def qg = waitForQualityGate() // Reuse taskId previously collected by withSonarQubeEnv
+                if (qg.status != 'OK') {
+                error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                }
+            }
+            }
+            stage('RunSCAAnalysisUsingSnyk') {
+                    steps {		
+                        withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
+                            sh 'mvn snyk:test -fn'
+                        }
+                    }
+            }       
+            stage('Packaging') {
+                steps {
+                    step([$class: 'ArtifactArchiver', artifacts: '**/target/*.jar', fingerprint: true])
+                }
+            }
+            
+            stage ("Artifactory Publish"){
+                steps{
+                    script{
+                            def server = Artifactory.server 'artifactory'
+                            def rtMaven = Artifactory.newMavenBuild()
+                            //rtMaven.resolver server: server, releaseRepo: 'jenkins-devops', snapshotRepo: 'jenkins-devops-snapshot'
+                            rtMaven.deployer server: server, releaseRepo: 'demo_pipe_repo', snapshotRepo: 'demo_pipe_snap'
+                            rtMaven.tool = 'maven'
+                            
+                            def buildInfo = rtMaven.run pom: '$workspace/pom.xml', goals: 'clean install'
+                            rtMaven.deployer.deployArtifacts = true
+                            rtMaven.deployer.deployArtifacts buildInfo
+
+                            server.publishBuildInfo buildInfo
+                    }
+                }
+        }
+        }
+}

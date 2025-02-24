@@ -1,9 +1,10 @@
+// multistage
 pipeline {
     agent any
 
     tools {
-        git 'git'
-        maven 'maven'
+        git 'git'  // Git tool configured in Jenkins
+        maven 'maven'  // Maven tool configured in Jenkins Global Tool Configuration
     }
 
     environment {
@@ -17,7 +18,7 @@ pipeline {
                 git url: 'https://github.com/kparunsagar/pipeline_springboot.git'
             }
         }
-
+        
         stage('Build') {
             steps {
                 script {
@@ -30,7 +31,7 @@ pipeline {
             }
         }
 
-        // OWASP Dependency-Check
+        // Added OWASP Dependency-Check stage
         stage('Dependency Check') {
             steps {
                 script {
@@ -52,7 +53,7 @@ pipeline {
                 }
             }
         }
-
+        
         stage('SonarQube Analysis') {
             steps {
                 script {
@@ -65,21 +66,18 @@ pipeline {
         }
 
         stage("Quality Gate") {
-            timeout(time: 1, unit: 'HOURS') {
-                def qg = waitForQualityGate()
+            timeout(time: 1, unit: 'HOURS') { // Just in case something goes wrong, pipeline will be killed after a timeout
+                def qg = waitForQualityGate() // Reuse taskId previously collected by withSonarQubeEnv
                 if (qg.status != 'OK') {
                     error "Pipeline aborted due to quality gate failure: ${qg.status}"
                 }
             }
         }
 
-        // Run Snyk Security Scan
         stage('RunSCAAnalysisUsingSnyk') {
             steps {
                 withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
-                    echo "-----------Snyk scan started--------------"
-                    sh 'mvn snyk:test -fn'  // This will trigger Snyk to check for vulnerabilities
-                    echo "-----------Snyk scan completed--------------"
+                    sh 'mvn snyk:test -fn'
                 }
             }
         }
@@ -89,12 +87,13 @@ pipeline {
                 step([$class: 'ArtifactArchiver', artifacts: '**/target/*.jar', fingerprint: true])
             }
         }
-
+        
         stage("Artifactory Publish") {
             steps {
                 script {
                     def server = Artifactory.server 'artifactory'
                     def rtMaven = Artifactory.newMavenBuild()
+                    //rtMaven.resolver server: server, releaseRepo: 'jenkins-devops', snapshotRepo: 'jenkins-devops-snapshot'
                     rtMaven.deployer server: server, releaseRepo: 'demo_pipe_repo', snapshotRepo: 'demo_pipe_snap'
                     rtMaven.tool = 'maven'
 

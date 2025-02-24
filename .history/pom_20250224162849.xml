@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -6,8 +7,8 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.6</version> <!-- Updated Spring Boot version -->
-        <relativePath />
+        <version>2.7.5</version> <!-- Spring Boot version -->
+        <relativePath /> <!-- lookup parent from repository -->
     </parent>
 
     <groupId>com.ashwin.web</groupId>
@@ -20,14 +21,6 @@
     <properties>
         <java.version>1.8</java.version>
     </properties>
-
-    <repositories>
-        <!-- Snyk Repository to resolve the Snyk plugin -->
-        <repository>
-            <id>snyk-repo</id>
-            <url>https://repo.snyk.io/maven</url>
-        </repository>
-    </repositories>
 
     <dependencies>
         <!-- Spring Boot Dependencies -->
@@ -42,6 +35,7 @@
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.30</version> <!-- Updated MySQL connector -->
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -65,44 +59,18 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Jackson Core Dependency (Updated to secure version) -->
+        <!-- Jackson Core Dependency - Updated to secure version -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.16.0</version>
+            <version>2.15.0</version> <!-- Updated to a secure version -->
         </dependency>
 
-        <!-- Log4j Dependency (Updated to secure version) -->
+        <!-- Log4j Dependency - Updated to a secure version -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-api</artifactId>
-            <version>2.19.0</version>
-        </dependency>
-
-        <!-- Logback Dependencies (Updated to secure version) -->
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>1.2.12</version>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-core</artifactId>
-            <version>1.2.12</version>
-        </dependency>
-
-        <!-- SnakeYAML Dependency (Updated to secure version) -->
-        <dependency>
-            <groupId>org.yaml</groupId>
-            <artifactId>snakeyaml</artifactId>
-            <version>1.32</version>
-        </dependency>
-
-        <!-- Tomcat Embed Core Dependency (Updated to secure version) -->
-        <dependency>
-            <groupId>org.apache.tomcat.embed</groupId>
-            <artifactId>tomcat-embed-core</artifactId>
-            <version>9.0.70</version>
+            <version>2.17.0</version> <!-- Updated to fix CVE vulnerabilities -->
         </dependency>
     </dependencies>
 
@@ -112,14 +80,6 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>2.7.6</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>repackage</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
 
             <!-- OWASP Dependency-Check Plugin -->
@@ -134,35 +94,34 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <outputDirectory>${project.build.directory}/dependency-check-report</outputDirectory>
+                    <failBuildOnCVSS>7</failBuildOnCVSS> <!-- Fail build if CVSS score >= 7 -->
+                </configuration>
             </plugin>
 
             <!-- JaCoCo Plugin for Code Coverage -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.8</version>
+                <version>0.8.7</version>
                 <executions>
                     <execution>
+                        <id>prepare-agent</id>
                         <goals>
                             <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>generate-report</id>
+                        <goals>
                             <goal>report</goal>
                         </goals>
+                        <phase>prepare-package</phase>
                     </execution>
                 </executions>
             </plugin>
 
-            <!-- Snyk Maven Plugin (Version 2.0.0) -->
-            <plugin>
-                <groupId>io.snyk</groupId>
-                <artifactId>snyk-maven-plugin</artifactId>
-                <version>2.0.0</version>
-                <inherited>false</inherited>
-                <configuration>
-                    <org>asecurityguru</org> <!-- Your organization name for Snyk -->
-                </configuration>
-            </plugin>
-
         </plugins>
     </build>
-
 </project>
