@@ -183,12 +183,12 @@
         <repository>
             <id>your-repo-id</id>
             <name>Your Repository</name>
-            <url>https://your-repository-url/repository/maven-releases/</url>
+            <url>http://52.140.43.39:8082/artifactory/springReleases/</url>
         </repository>
         <snapshotRepository>
             <id>your-snapshot-repo-id</id>
             <name>Your Snapshot Repository</name>
-            <url>https://your-repository-url/repository/maven-snapshots/</url>
+            <url>http://52.140.43.39:8082/artifactory/SpringSnapshot/</url>
         </snapshotRepository>
     </distributionManagement>
 </project>
