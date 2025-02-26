@@ -4,15 +4,14 @@ pipeline {
     tools {
         git 'git'
         maven 'maven'
-        // Define the tool 'DP' for OWASP Dependency-Check here if it's installed globally
     }
 
     environment {
-        // Define environment variables here if needed
-        MAVEN_HOME = tool 'maven'   // Referencing Maven tool globally
+        MAVEN_HOME = tool 'maven'
         ARTIFACTORY_CREDENTIALS = 'artifactory-credentials'
         REPO_RELEASE = 'springReleases'
         REPO_SNAPSHOT = 'SpringSnapshot'
+        DOCKERHUB_CREDENTIALS = credentials('docker')
     }
 
     stages {
@@ -26,28 +25,26 @@ pipeline {
             steps {
                 script {
                     echo "-----------Build started--------------"
-                    sh "${MAVEN_HOME}/bin/mvn -B verify"
-                    // Uncomment for skipping tests during build
-                    sh "${MAVEN_HOME}/bin/mvn clean deploy -Dmaven.test.skip=true"
+                    sh "${MAVEN_HOME}/bin/mvn clean verify"  // Do NOT skip tests
+                    sh "${MAVEN_HOME}/bin/mvn clean deploy"  // No test skipping!
                 }
             }
         }
 
-        //stage("OWASP Dependency Check") {
-        //    steps {
-        //        dependencyCheck additionalArguments: '--scan ./ --format HTML', odcInstallation: 'owasp'
-        //        dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-        //    }
-        //}
-
-        stage('Test') {
+        stage("OWASP Dependency Check") {
             steps {
-                script {
-                    echo "-----------Unit test started--------------"
-                    // Run unit tests with Maven
-                    sh "${MAVEN_HOME}/bin/mvn test"
-                    sh 'mvn surefire-report:report'
-                    echo "-----------Unit test completed--------------"
+                withEnv(["_JAVA_OPTIONS=-Xmx4G"]) { 
+                    dependencyCheck additionalArguments: '--scan ./target --format HTML --enableExperimental --noupdate', 
+                                    odcInstallation: 'owasp'
+                }
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+            }
+        }
+
+        stage('JUnit Test Results') {
+            steps{ 
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                junit '**/target/surefire-reports/*.xml'
                 }
             }
         }
@@ -55,29 +52,24 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    // Ensure that 'sonarqube-server' is defined in Jenkins system configuration under SonarQube servers
                     withSonarQubeEnv('sonarqube-server') {  
                         echo "-----------SonarQube Analysis started--------------"
-                        // Run SonarQube analysis using Maven command directly
-                        sh "${MAVEN_HOME}/bin/mvn clean verify sonar:sonar -Dsonar.projectKey=springProject"
+                        sh "${MAVEN_HOME}/bin/mvn sonar:sonar -Dsonar.projectKey=springProject"
                         echo "-----------SonarQube Analysis completed--------------"
                     }
                 }
             }
         }
 
-        //stage('Quality Gate') {
-          //  steps {
-            //    timeout(time: 5, unit: 'MINUTES') {  // Timeout of 5 minutes
-              //      script {
-                //        def qg = waitForQualityGate()  // Wait for the quality gate result
-                  //      if (qg.status != 'OK') {
-                    //        error "Pipeline aborted due to quality gate failure: ${qg.status}"
-                      //  }
-                    //}
-                //}
-            //}
-        //}
+        stage('RunSCAAnalysisUsingSnyk') {
+            steps {
+                withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
+                    withEnv(["_JAVA_OPTIONS=-Xmx4G"]) {
+                        sh "${MAVEN_HOME}/bin/mvn snyk:test -fn"
+                    }
+                }
+            }
+        }
 
         stage('Packaging') {
             steps {
@@ -96,7 +88,6 @@ pipeline {
                         rtMaven.deployer server: server, releaseRepo: 'springReleases', snapshotRepo: 'SpringSnapshot'
                         rtMaven.tool = 'maven'
         
-                        // Use the credentials for authentication
                         server.credentialsId = 'artifactory-credentials'
         
                         def buildInfo = rtMaven.run pom: '$workspace/pom.xml', goals: 'clean install'
@@ -108,7 +99,25 @@ pipeline {
                 }
             }
         }
-
-
+        stage("Build docker image"){
+          steps {
+            sh 'cp target/*.jar .'
+            sh 'docker build -t kparun/devsecopspractice:$BUILD_NUMBER .'
+          }
+        }
+        stage("Login to docker hub") {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker', 
+                                                  usernameVariable: 'DOCKER_USER', 
+                                                  passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                }
+            }
+        }
+        stage("Docker push"){
+          steps {
+            sh 'docker push kparun/devsecopspractice:$BUILD_NUMBER'
+          }
+        }
     }
 }
