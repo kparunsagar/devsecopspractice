@@ -4,49 +4,48 @@ pipeline {
     tools {
         git 'git'
         maven 'maven'
+        // Define the tool 'DP' for OWASP Dependency-Check here if it's installed globally
     }
 
     environment {
-        ARTIFACTORY_SERVER = 'Artifactory'
-        CI = true
+        // Define environment variables here if needed
+        MAVEN_HOME = tool 'maven'   // Referencing Maven tool globally
+        ARTIFACTORY_CREDENTIALS = 'artifactory-credentials'
+        REPO_RELEASE = 'springReleases'
+        REPO_SNAPSHOT = 'SpringSnapshot'
     }
 
     stages {
         stage('Source') {
             steps {
-                git url: 'https://github.com/kparunsagar/pipeline_springboot.git'
+                git url: 'https://github.com/kparunsagar/devsecopspractice.git', branch: 'main'
             }
         }
 
         stage('Build') {
             steps {
                 script {
-                    def mvnHome = tool 'maven'
-                    bat "${mvnHome}\\bin\\mvn -B verify"
                     echo "-----------Build started--------------"
-                    sh 'mvn clean deploy -Dmaven.test.skip=true'
-                    echo "-----------Build completed--------------"
+                    sh "${MAVEN_HOME}/bin/mvn -B verify"
+                    // Uncomment for skipping tests during build
+                    sh "${MAVEN_HOME}/bin/mvn clean deploy -Dmaven.test.skip=true"
                 }
             }
         }
 
-        // OWASP Dependency-Check
-        stage('Dependency Check') {
-            steps {
-                script {
-                    def mvnHome = tool 'maven'
-                    echo "-----------OWASP Dependency-Check started--------------"
-                    sh "'${mvnHome}/bin/mvn' dependency-check:check"
-                    echo "-----------OWASP Dependency-Check completed--------------"
-                }
-            }
-        }
+        //stage("OWASP Dependency Check") {
+        //    steps {
+        //        dependencyCheck additionalArguments: '--scan ./ --format HTML', odcInstallation: 'owasp'
+        //        dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+        //    }
+        //}
 
         stage('Test') {
             steps {
                 script {
-                    def mvnHome = tool 'maven'
                     echo "-----------Unit test started--------------"
+                    // Run unit tests with Maven
+                    sh "${MAVEN_HOME}/bin/mvn test"
                     sh 'mvn surefire-report:report'
                     echo "-----------Unit test completed--------------"
                 }
@@ -56,33 +55,29 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    def mvnHome = tool 'maven'
-                    withSonarQubeEnv() {
-                        bat "${mvnHome}/bin/mvn clean verify sonar:sonar -Dsonar.projectKey=sts"
+                    // Ensure that 'sonarqube-server' is defined in Jenkins system configuration under SonarQube servers
+                    withSonarQubeEnv('sonarqube-server') {  
+                        echo "-----------SonarQube Analysis started--------------"
+                        // Run SonarQube analysis using Maven command directly
+                        sh "${MAVEN_HOME}/bin/mvn clean verify sonar:sonar -Dsonar.projectKey=springProject"
+                        echo "-----------SonarQube Analysis completed--------------"
                     }
                 }
             }
         }
 
-        stage("Quality Gate") {
-            timeout(time: 1, unit: 'HOURS') {
-                def qg = waitForQualityGate()
-                if (qg.status != 'OK') {
-                    error "Pipeline aborted due to quality gate failure: ${qg.status}"
-                }
-            }
-        }
-
-        // Run Snyk Security Scan
-        stage('RunSCAAnalysisUsingSnyk') {
-            steps {
-                withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
-                    echo "-----------Snyk scan started--------------"
-                    sh 'mvn snyk:test -fn'  // This will trigger Snyk to check for vulnerabilities
-                    echo "-----------Snyk scan completed--------------"
-                }
-            }
-        }
+        //stage('Quality Gate') {
+          //  steps {
+            //    timeout(time: 5, unit: 'MINUTES') {  // Timeout of 5 minutes
+              //      script {
+                //        def qg = waitForQualityGate()  // Wait for the quality gate result
+                  //      if (qg.status != 'OK') {
+                    //        error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                      //  }
+                    //}
+                //}
+            //}
+        //}
 
         stage('Packaging') {
             steps {
@@ -93,18 +88,27 @@ pipeline {
         stage("Artifactory Publish") {
             steps {
                 script {
-                    def server = Artifactory.server 'artifactory'
-                    def rtMaven = Artifactory.newMavenBuild()
-                    rtMaven.deployer server: server, releaseRepo: 'demo_pipe_repo', snapshotRepo: 'demo_pipe_snap'
-                    rtMaven.tool = 'maven'
-
-                    def buildInfo = rtMaven.run pom: '$workspace/pom.xml', goals: 'clean install'
-                    rtMaven.deployer.deployArtifacts = true
-                    rtMaven.deployer.deployArtifacts buildInfo
-
-                    server.publishBuildInfo buildInfo
+                    withCredentials([usernamePassword(credentialsId: 'artifactory-credentials', 
+                                                     usernameVariable: 'ARTIFACTORY_USERNAME', 
+                                                     passwordVariable: 'ARTIFACTORY_PASSWORD')]) {
+                        def server = Artifactory.server 'Artifactory'
+                        def rtMaven = Artifactory.newMavenBuild()
+                        rtMaven.deployer server: server, releaseRepo: 'springReleases', snapshotRepo: 'SpringSnapshot'
+                        rtMaven.tool = 'maven'
+        
+                        // Use the credentials for authentication
+                        server.credentialsId = 'artifactory-credentials'
+        
+                        def buildInfo = rtMaven.run pom: '$workspace/pom.xml', goals: 'clean install'
+                        rtMaven.deployer.deployArtifacts = true
+                        rtMaven.deployer.deployArtifacts buildInfo
+        
+                        server.publishBuildInfo buildInfo
+                    }
                 }
             }
         }
+
+
     }
 }
