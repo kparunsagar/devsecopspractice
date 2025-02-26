@@ -182,12 +182,12 @@
     <distributionManagement>
         <repository>
             <id>springRelease</id>
-            //<name>Your Repository</name>
+            <!-- <name>Your Repository</name> -->  <!-- Correct XML comment style -->
             <url>http://52.140.43.39:8082/artifactory/springReleases/</url>
         </repository>
         <snapshotRepository>
             <id>SpringSnapshot</id>
-            //<name>Your Snapshot Repository</name>
+            <!-- <name>Your Snapshot Repository</name> --> <!-- Correct XML comment style -->
             <url>http://52.140.43.39:8082/artifactory/SpringSnapshot/</url>
         </snapshotRepository>
     </distributionManagement>
